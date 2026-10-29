@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Anonymous survey submissions for researcher analysis
+    match /submissions/{submissionId} {
+      allow create: if request.resource.data.id is string
+        && request.resource.data.participantId is string
+        && request.resource.data.totalScore is number
+        && request.resource.data.totalScore >= 18
+        && request.resource.data.totalScore <= 90
+        && request.resource.data.profile is string;
+
+      allow read: if true;
+
+      allow delete: if true;
+
+      allow update: if false;
+    }
+  }
+}

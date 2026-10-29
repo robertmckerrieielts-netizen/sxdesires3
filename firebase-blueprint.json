@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "SurveySubmission": {
+      "title": "SurveySubmission",
+      "description": "A completed sexual desire assessment survey response",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique submission ID" },
+        "participantId": { "type": "string", "description": "Anonymous participant alias" },
+        "timestamp": { "type": "string", "description": "Submission ISO timestamp" },
+        "totalScore": { "type": "number", "description": "Calculated score between 18 and 90" },
+        "profile": { "type": "string", "description": "Identified desire profile category" },
+        "answers": { "type": "object", "description": "Map of question ID to chosen option (A/B/C/D)" },
+        "pointsBreakdown": { "type": "object", "description": "Map of question ID to assigned points" },
+        "demographics": { "type": "object", "description": "Optional demographic context" },
+        "durationSeconds": { "type": "number", "description": "Time taken to complete the survey" }
+      },
+      "required": ["id", "participantId", "timestamp", "totalScore", "profile", "answers"]
+    }
+  },
+  "firestore": {
+    "/submissions/{submissionId}": {
+      "schema": "SurveySubmission",
+      "description": "Collection of all anonymous survey responses for researcher review"
+    }
+  }
+}

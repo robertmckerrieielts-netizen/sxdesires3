@@ -1,3 +1,13 @@
+import {
+  collection,
+  doc,
+  setDoc,
+  getDocs,
+  deleteDoc,
+  query,
+  orderBy,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase.ts';
 import { SurveySubmission } from '../types/survey.ts';
 
 const LOCAL_STORAGE_KEY = 'sdas_submissions_cache_v1';
@@ -91,25 +101,7 @@ const DEFAULT_SAMPLE_DATA: SurveySubmission[] = [
 ];
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  try {
-    const res = await fetch('/api/admin/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.authenticated) {
-        sessionStorage.setItem(ADMIN_AUTH_KEY, password);
-        return true;
-      }
-    }
-  } catch {
-    // If backend isn't reachable (e.g. static host like Netlify), check client-side password directly
-  }
-
-  // Exact password check specified by user: Son112233#
+  // Check exact password Son112233#
   if (password === 'Son112233#') {
     sessionStorage.setItem(ADMIN_AUTH_KEY, password);
     return true;
@@ -125,84 +117,95 @@ export function logoutAdmin(): void {
   sessionStorage.removeItem(ADMIN_AUTH_KEY);
 }
 
+/**
+ * Fetch all survey submissions from Firebase Cloud Firestore.
+ * This aggregates responses submitted from ANY browser or device in the world.
+ */
 export async function fetchAllSubmissions(): Promise<SurveySubmission[]> {
   try {
-    const authPass = sessionStorage.getItem(ADMIN_AUTH_KEY) || 'Son112233#';
-    const res = await fetch('/api/admin/submissions', {
-      headers: {
-        Authorization: `Bearer ${authPass}`,
-      },
-    });
+    const submissionsRef = collection(db, 'submissions');
+    const q = query(submissionsRef, orderBy('timestamp', 'desc'));
+    const snapshot = await getDocs(q);
 
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.submissions) && data.submissions.length > 0) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data.submissions));
-        return data.submissions;
-      }
+    if (!snapshot.empty) {
+      const liveData: SurveySubmission[] = [];
+      snapshot.forEach((docSnap) => {
+        liveData.push(docSnap.data() as SurveySubmission);
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(liveData));
+      return liveData;
     }
-  } catch (err) {
-    console.warn('Backend fetch bypassed, reading from local store:', err);
-  }
 
-  return getLocalSubmissions();
+    // If Firestore collection is empty, seed with initial sample data so admin can test
+    for (const sample of DEFAULT_SAMPLE_DATA) {
+      await setDoc(doc(db, 'submissions', sample.id), sample).catch(() => {});
+    }
+    return DEFAULT_SAMPLE_DATA;
+  } catch (err) {
+    console.warn('Firestore fetch failed, reading from local fallback:', err);
+    return getLocalSubmissions();
+  }
 }
 
+/**
+ * Submits survey to Cloud Firestore so the Admin can see it in real-time from any device.
+ */
 export async function submitSurvey(submission: SurveySubmission): Promise<SurveySubmission> {
+  // 1. Save to local storage for instant offline resilience
   const existing = getLocalSubmissions();
   const updated = [submission, ...existing.filter((s) => s.id !== submission.id)];
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
+  // 2. Upload to Cloud Firestore
   try {
-    const res = await fetch('/api/submissions', {
+    const docRef = doc(db, 'submissions', submission.id);
+    await setDoc(docRef, submission);
+  } catch (err) {
+    console.warn('Cloud Firestore sync warning (saved locally):', err);
+  }
+
+  // 3. Also ping backend if running
+  try {
+    fetch('/api/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(submission),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.submission) {
-        return data.submission;
-      }
-    }
-  } catch (err) {
-    console.warn('Backend submit bypassed, saved in localStorage:', err);
+    }).catch(() => {});
+  } catch {
+    // Ignore
   }
 
   return submission;
 }
 
+/**
+ * Deletes a submission from Cloud Firestore and local store.
+ */
 export async function deleteSubmission(id: string): Promise<boolean> {
   const existing = getLocalSubmissions();
   const filtered = existing.filter((s) => s.id !== id);
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
 
   try {
-    const authPass = sessionStorage.getItem(ADMIN_AUTH_KEY) || 'Son112233#';
-    const res = await fetch(`/api/admin/submissions/${id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${authPass}`,
-      },
-    });
-    return res.ok;
-  } catch {
+    const docRef = doc(db, 'submissions', id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.warn('Firestore delete failed:', err);
     return true;
   }
 }
 
+/**
+ * Resets sample data in Firestore and local store.
+ */
 export async function resetSubmissions(): Promise<boolean> {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_SAMPLE_DATA));
   try {
-    const authPass = sessionStorage.getItem(ADMIN_AUTH_KEY) || 'Son112233#';
-    const res = await fetch('/api/admin/submissions/reset', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authPass}`,
-      },
-    });
-    return res.ok;
+    for (const sample of DEFAULT_SAMPLE_DATA) {
+      await setDoc(doc(db, 'submissions', sample.id), sample);
+    }
+    return true;
   } catch {
     return true;
   }
@@ -217,8 +220,6 @@ function getLocalSubmissions(): SurveySubmission[] {
         return parsed;
       }
     }
-    // Seed with initial sample data if empty
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_SAMPLE_DATA));
     return DEFAULT_SAMPLE_DATA;
   } catch {
     return DEFAULT_SAMPLE_DATA;

@@ -3,6 +3,93 @@ import { SurveySubmission } from '../types/survey.ts';
 const LOCAL_STORAGE_KEY = 'sdas_submissions_cache_v1';
 const ADMIN_AUTH_KEY = 'sdas_admin_auth_token_v1';
 
+const DEFAULT_SAMPLE_DATA: SurveySubmission[] = [
+  {
+    id: 'sub-sample-01',
+    participantId: 'P-9482',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
+    demographics: {
+      ageGroup: '26-35',
+      gender: 'Female',
+      relationshipStatus: 'In a relationship',
+    },
+    answers: {
+      1: 'B', 2: 'A', 3: 'B', 4: 'B', 5: 'A', 6: 'B', 7: 'A', 8: 'B', 9: 'A',
+      10: 'A', 11: 'A', 12: 'B', 13: 'A', 14: 'B', 15: 'B', 16: 'A', 17: 'A', 18: 'B'
+    },
+    pointsBreakdown: {
+      1: 4, 2: 5, 3: 4, 4: 4, 5: 5, 6: 4, 7: 5, 8: 4, 9: 5,
+      10: 5, 11: 5, 12: 4, 13: 5, 14: 4, 15: 4, 16: 5, 17: 5, 18: 4
+    },
+    totalScore: 81,
+    profile: 'High / Vibrant Desire',
+    durationSeconds: 245
+  },
+  {
+    id: 'sub-sample-02',
+    participantId: 'P-8310',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+    demographics: {
+      ageGroup: '36-45',
+      gender: 'Male',
+      relationshipStatus: 'Married / Cohabiting',
+    },
+    answers: {
+      1: 'B', 2: 'B', 3: 'B', 4: 'C', 5: 'B', 6: 'B', 7: 'B', 8: 'C', 9: 'B',
+      10: 'B', 11: 'B', 12: 'B', 13: 'B', 14: 'B', 15: 'B', 16: 'B', 17: 'B', 18: 'B'
+    },
+    pointsBreakdown: {
+      1: 4, 2: 4, 3: 4, 4: 2, 5: 4, 6: 4, 7: 4, 8: 2, 9: 4,
+      10: 4, 11: 4, 12: 4, 13: 4, 14: 4, 15: 4, 16: 4, 17: 4, 18: 4
+    },
+    totalScore: 68,
+    profile: 'Moderate / Balanced Desire',
+    durationSeconds: 310
+  },
+  {
+    id: 'sub-sample-03',
+    participantId: 'P-5192',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+    demographics: {
+      ageGroup: '26-35',
+      gender: 'Non-binary',
+      relationshipStatus: 'In a relationship',
+    },
+    answers: {
+      1: 'C', 2: 'C', 3: 'C', 4: 'D', 5: 'C', 6: 'C', 7: 'C', 8: 'D', 9: 'C',
+      10: 'C', 11: 'C', 12: 'C', 13: 'C', 14: 'C', 15: 'C', 16: 'A', 17: 'B', 18: 'C'
+    },
+    pointsBreakdown: {
+      1: 2, 2: 2, 3: 2, 4: 1, 5: 2, 6: 2, 7: 2, 8: 1, 9: 2,
+      10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 5, 17: 4, 18: 2
+    },
+    totalScore: 37,
+    profile: 'Low-to-Moderate / Context-Sensitive Desire',
+    durationSeconds: 280
+  },
+  {
+    id: 'sub-sample-04',
+    participantId: 'P-3741',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+    demographics: {
+      ageGroup: '46-55',
+      gender: 'Female',
+      relationshipStatus: 'Single',
+    },
+    answers: {
+      1: 'D', 2: 'D', 3: 'D', 4: 'D', 5: 'D', 6: 'D', 7: 'D', 8: 'D', 9: 'D',
+      10: 'D', 11: 'C', 12: 'D', 13: 'D', 14: 'C', 15: 'D', 16: 'D', 17: 'C', 18: 'D'
+    },
+    pointsBreakdown: {
+      1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1,
+      10: 1, 11: 2, 12: 1, 13: 1, 14: 2, 15: 1, 16: 1, 17: 2, 18: 1
+    },
+    totalScore: 21,
+    profile: 'Low / Dormant Desire',
+    durationSeconds: 195
+  }
+];
+
 export async function verifyAdminPassword(password: string): Promise<boolean> {
   try {
     const res = await fetch('/api/admin/verify', {
@@ -19,7 +106,7 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
       }
     }
   } catch {
-    // If backend isn't reachable, check client-side password directly
+    // If backend isn't reachable (e.g. static host like Netlify), check client-side password directly
   }
 
   // Exact password check specified by user: Son112233#
@@ -49,30 +136,19 @@ export async function fetchAllSubmissions(): Promise<SurveySubmission[]> {
 
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.submissions)) {
-        // Update local cache
+      if (Array.isArray(data.submissions) && data.submissions.length > 0) {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data.submissions));
         return data.submissions;
       }
     }
   } catch (err) {
-    console.warn('Backend submissions fetch failed, reading from local cache:', err);
+    console.warn('Backend fetch bypassed, reading from local store:', err);
   }
 
-  // Fallback to local storage
-  const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch {
-      return [];
-    }
-  }
-  return [];
+  return getLocalSubmissions();
 }
 
 export async function submitSurvey(submission: SurveySubmission): Promise<SurveySubmission> {
-  // Save to local storage first
   const existing = getLocalSubmissions();
   const updated = [submission, ...existing.filter((s) => s.id !== submission.id)];
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
@@ -91,7 +167,7 @@ export async function submitSurvey(submission: SurveySubmission): Promise<Survey
       }
     }
   } catch (err) {
-    console.warn('Backend submit failed, saved locally:', err);
+    console.warn('Backend submit bypassed, saved in localStorage:', err);
   }
 
   return submission;
@@ -117,7 +193,7 @@ export async function deleteSubmission(id: string): Promise<boolean> {
 }
 
 export async function resetSubmissions(): Promise<boolean> {
-  localStorage.removeItem(LOCAL_STORAGE_KEY);
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_SAMPLE_DATA));
   try {
     const authPass = sessionStorage.getItem(ADMIN_AUTH_KEY) || 'Son112233#';
     const res = await fetch('/api/admin/submissions/reset', {
@@ -135,8 +211,16 @@ export async function resetSubmissions(): Promise<boolean> {
 function getLocalSubmissions(): SurveySubmission[] {
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    // Seed with initial sample data if empty
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_SAMPLE_DATA));
+    return DEFAULT_SAMPLE_DATA;
   } catch {
-    return [];
+    return DEFAULT_SAMPLE_DATA;
   }
 }

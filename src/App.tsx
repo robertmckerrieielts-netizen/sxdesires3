@@ -20,10 +20,10 @@ type ViewMode = 'welcome' | 'survey' | 'results' | 'admin';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
-    // Check if initial URL is /admin or #admin
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
-    if (path.includes('/admin') || hash.includes('admin')) {
+    const search = window.location.search.toLowerCase();
+    if (path.includes('/admin') || hash.includes('admin') || search.includes('admin')) {
       return 'admin';
     }
     return 'welcome';
@@ -39,12 +39,13 @@ export default function App() {
   // Methodology modal
   const [isMethodologyOpen, setIsMethodologyOpen] = useState<boolean>(false);
 
-  // Synchronize browser history and URL hash/path
+  // Synchronize browser history and URL hash/path/search
   useEffect(() => {
     const handleLocationChange = () => {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
-      if (path.includes('/admin') || hash.includes('admin')) {
+      const search = window.location.search.toLowerCase();
+      if (path.includes('/admin') || hash.includes('admin') || search.includes('admin')) {
         setCurrentView('admin');
       } else if (currentView === 'admin') {
         setCurrentView('welcome');

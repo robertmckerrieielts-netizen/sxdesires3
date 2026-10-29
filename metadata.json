@@ -1,0 +1,6 @@
+{
+  "name": "Sexual Desire Assessment Survey",
+  "description": "An empirical behavioral research survey assessing adult sexual desire profiles, spontaneous and responsive arousal patterns, with scoring analysis and researcher admin portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
